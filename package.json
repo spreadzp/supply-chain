@@ -1,0 +1,29 @@
+{
+  "name": "supply-chain-medicine",
+  "version": "1.0.0",
+  "description": "supply-chain on ether.",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start-ganache": "ganache-cli --port 9545 --gasLimit 0xffffffffff ",
+    "mr": "rm -rf ./build && truffle migrate --reset"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/truffle-box/react-box.git"
+  },
+  "keywords": [],
+  "author": "spread2009@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/truffle-box/react-box/issues"
+  },
+  "homepage": "https://github.com/truffle-box/react-box#readme",
+  "dependencies": {
+    "openzeppelin-solidity": "^1.11.0",
+    "truffle-hdwallet-provider": "0.0.6"
+  }
+}
