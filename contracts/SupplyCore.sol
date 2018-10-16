@@ -1,19 +1,34 @@
 pragma solidity ^0.4.24;
+
 contract SupplyCore {
     
     event NewSupply(uint256 _sumTheMedicine, string _nameOfMedicine, uint256 _countOfMedicine, uint256 _intervalTimeSupply);
     event NewHash(bytes32 _hash);
-    modifier onlyPartnersSupplier(bytes32 hashMedicine) {
-        address supplier = drugs[hashMedicine][0].supplier;
-        address[] storage partners = partnersOfSupplier[supplier];
+
+    modifier onlyNoConsignerPartnersSupplier(bytes32 hashSupply) {
+        address supplier = drugs[hashSupply][0].supplier;
+        address[] storage partners = partnersOfSupplier[supplier];        
         uint256 countPartners = partners.length;
+        address[] storage cosignerPartners = cosignersSupply[hashSupply];
+        uint256 countCosignerPartners = cosignerPartners.length;
         bool patnerSupply = false;
         for(uint256 i = 0; i < countPartners; i++) {
             if(msg.sender == partners[i]) {
                 patnerSupply = true;
+                for(uint256 j = 0; j < countCosignerPartners; j++) {
+                    if(msg.sender == cosignerPartners[j]) {
+                       patnerSupply = false; 
+                    }
+                }
             }
         }
         require(patnerSupply);
+        _;
+    }
+
+    modifier onlySupplyTime(bytes32 _hashSupply) {
+    uint256 endTime = supplies[_hash].finishTimeOfSupply;
+        require(endTime > now);
         _;
     }
     
@@ -22,7 +37,7 @@ contract SupplyCore {
         uint256 payment;
         string nameOfMedicine;
         uint256 countOfMedicine;
-        uint256 intervalTimeOfSupply;
+        uint256 finishTimeOfSupply;
         address supplier;
         bool supplyFinish;
         bool paymentToSupplier;
@@ -34,6 +49,7 @@ contract SupplyCore {
         address supplier;
     }
     
+    mapping (bytes32 => address[]) public cosignersSupply;
     mapping (bytes32 => Drug[]) public drugs;
     mapping (address => bytes32[]) public medicinesOfSupplier;
     mapping (address => bytes32[]) public consumerHashes;
@@ -109,15 +125,16 @@ contract SupplyCore {
             intervalTimeOfSupply: _intervalTimeSupply, supplier: drugs[_hashDrug][0].supplier,
             supplyFinish: false, paymentToSupplier: false});
         supplies[newHashSupply].push(newSupply);
-        emit NewSupply(msg.value, drugs[_hashDrug][0].nameDrug, _countOfMedicine, _intervalTimeSupply);
+        emit NewSupply (msg.value, drugs[_hashDrug][0].nameDrug, _countOfMedicine, _intervalTimeSupply);
     }
     
-    function cosignSupply(bytes32 hashSupply) public view onlyPartnersSupplier(hashSupply){
-        
+    function cosignSupply(bytes32 hashSupply) public onlySupplyTime(hashSupply)
+     onlyNoConsignerPartnersSupplier(hashSupply) {
+        cosignersSupply[hashSupply][0].push(msg.sender);
     }
     
     function createHashSupply(uint256 countOfMedicine, uint256 intervalTimeSupply) public returns (bytes32) {
-        bytes32 hash = keccak256(abi.encodePacked(countOfMedicine,  intervalTimeSupply, now));
+        bytes32 hash = keccak256(abi.encodePacked(countOfMedicine, intervalTimeSupply, now));
         emit NewHash(hash);
         return hash;
     }
