@@ -3,6 +3,20 @@ contract SupplyCore {
     
     event NewSupply(uint256 _sumTheMedicine, string _nameOfMedicine, uint256 _countOfMedicine, uint256 _intervalTimeSupply);
     event NewHash(bytes32 _hash);
+    modifier onlyPartnersSupplier(bytes32 hashMedicine) {
+        address supplier = drugs[hashMedicine][0].supplier;
+        address[] storage partners = partnersOfSupplier[supplier];
+        uint256 countPartners = partners.length;
+        bool patnerSupply = false;
+        for(uint256 i = 0; i < countPartners; i++) {
+            if(msg.sender == partners[i]) {
+                patnerSupply = true;
+            }
+        }
+        require(patnerSupply);
+        _;
+    }
+    
     struct Supply {
         address consumer;
         uint256 payment;
@@ -89,8 +103,7 @@ contract SupplyCore {
         require (msg.value >= sumOfConsumer, "consumer have not enough ethers for this supply");
         bytes32 newHashSupply = createHashSupply(_countOfMedicine, _intervalTimeSupply);
         consumerHashes[msg.sender].push(newHashSupply);
-        Supply memory newSupply = Supply({
-            consumer: msg.sender, payment: msg.value,
+        Supply memory newSupply = Supply({consumer: msg.sender, payment: msg.value,
             nameOfMedicine: drugs[_hashDrug][0].nameDrug,
             countOfMedicine: _countOfMedicine,
             intervalTimeOfSupply: _intervalTimeSupply, supplier: drugs[_hashDrug][0].supplier,
@@ -99,6 +112,9 @@ contract SupplyCore {
         emit NewSupply(msg.value, drugs[_hashDrug][0].nameDrug, _countOfMedicine, _intervalTimeSupply);
     }
     
+    function cosignSupply(bytes32 hashSupply) public view onlyPartnersSupplier(hashSupply){
+        
+    }
     
     function createHashSupply(uint256 countOfMedicine, uint256 intervalTimeSupply) public returns (bytes32) {
         bytes32 hash = keccak256(abi.encodePacked(countOfMedicine,  intervalTimeSupply, now));
