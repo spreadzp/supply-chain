@@ -1,8 +1,6 @@
-const Holy = artifacts.require("./Holy.sol");
+const SupplyCore = artifacts.require("./SupplyCore.sol");
 
 module.exports = function (deployer, network, accounts) {
-  return deployer.deploy(Holy,
-    accounts[1], // player1
-    accounts[2], // player2 ,
+  return deployer.deploy(SupplyCore,
     { gasLimit: 6721970, from: accounts[0] })
 };

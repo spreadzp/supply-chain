@@ -1,10 +1,6 @@
-pragma solidity ^0.4.24; 
+pragma solidity ^0.4.24;  
 
-pragma solidity ^0.4.24;
-contract SupplyCore {
-    
-    constructor () public {
-    }
+contract SupplyCore { 
 
     struct Supply {
         address consumer;
@@ -30,8 +26,11 @@ contract SupplyCore {
 
     function createSupply (
         uint256 priceTheMedicine, bytes32 nameOfMedicine,
-        uint256 countOfMedicine, uint256 intervalTimeSupply) public payable {
-        require (suppliers.length == 0, "supplier have not partners");
-        require (msg.value <= priceTheMedicine, "consumer have not enough ethers for this supply");
+        uint256 countOfMedicine, uint256 intervalTimeSupply) public payable
+    {
+        require (suppliers.length == 0);
+        // , "supplier have not partners"
+        require (msg.value <= priceTheMedicine);
+        // , "consumer have not enough ethers for this supply"
     } 
 }
