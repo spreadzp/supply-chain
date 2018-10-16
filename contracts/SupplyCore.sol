@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 contract SupplyCore {
     
-    event NewSupply(uint256 _priceTheMedicine, string _nameOfMedicine, uint256 _countOfMedicine, uint256 _intervalTimeSupply);
+    event NewSupply(uint256 _sumTheMedicine, string _nameOfMedicine, uint256 _countOfMedicine, uint256 _intervalTimeSupply);
     event NewHash(bytes32 _hash);
     struct Supply {
         address consumer;
@@ -9,7 +9,7 @@ contract SupplyCore {
         string nameOfMedicine;
         uint256 countOfMedicine;
         uint256 intervalTimeOfSupply;
-        address[] suppliers;
+        address supplier;
         bool supplyFinish;
         bool paymentToSupplier;
     }
@@ -17,23 +17,37 @@ contract SupplyCore {
     struct Drug {
         string nameDrug;
         uint256 priceDrug;
+        address supplier;
     }
     
-    mapping (address => Drug[]) public drugs;
+    mapping (bytes32 => Drug[]) public drugs;
+    mapping (address => bytes32[]) public medicinesOfSupplier;
     mapping (address => bytes32[]) public consumerHashes;
     mapping (bytes32 => Supply[]) public supplies;
+    mapping (address => address[]) public partnersOfSupplier;
     address[]internal _suppliers; 
+    
     // @dev don't accept straight eth (normally comes with low gas)
     function () public payable {
         revert();
     }
     
+    // add modifier supplier
     function addDrug(string name, uint256 price) public {
         Drug memory newDrug = Drug({
             nameDrug: name,
-            priceDrug: price
+            priceDrug: price,
+            supplier: msg.sender
         });
-        drugs[msg.sender].push(newDrug);
+        bytes32 hashMedicine = keccak256(abi.encodePacked(name,  price, msg.sender));
+        medicinesOfSupplier[msg.sender].push(hashMedicine);
+        drugs[hashMedicine].push(newDrug);
+    }
+    
+    function getMedicines(bytes32 hashDrug) public view returns(string nameDrug,
+        uint256 priceDrug, address supplier) {
+        return (drugs[hashDrug][0].nameDrug, drugs[hashDrug][0].priceDrug,
+        drugs[hashDrug][0].supplier);
     }
     
     function addSupplierPartners(address partner) public {
@@ -69,25 +83,24 @@ contract SupplyCore {
     
 
     function createSupply (
-        uint256 _priceTheMedicine, string _nameOfMedicine,
-        uint256 _countOfMedicine, uint256 _intervalTimeSupply) public payable {
+        bytes32 _hashDrug, uint256 _countOfMedicine, uint256 _intervalTimeSupply) public payable {
         // require (_suppliers.length == 0, "supplier have not partners");
-        require (msg.value != 0, "consumer have not enough ethers for this supply");
+        uint256 sumOfConsumer = drugs[_hashDrug][0].priceDrug * _countOfMedicine;
+        require (msg.value >= sumOfConsumer, "consumer have not enough ethers for this supply");
         bytes32 newHashSupply = createHashSupply(_countOfMedicine, _intervalTimeSupply);
         consumerHashes[msg.sender].push(newHashSupply);
         Supply memory newSupply = Supply({
             consumer: msg.sender, payment: msg.value,
-            nameOfMedicine: _nameOfMedicine,
+            nameOfMedicine: drugs[_hashDrug][0].nameDrug,
             countOfMedicine: _countOfMedicine,
-            intervalTimeOfSupply: _intervalTimeSupply, suppliers: _suppliers,
+            intervalTimeOfSupply: _intervalTimeSupply, supplier: drugs[_hashDrug][0].supplier,
             supplyFinish: false, paymentToSupplier: false});
         supplies[newHashSupply].push(newSupply);
-        emit NewSupply(_priceTheMedicine, _nameOfMedicine, _countOfMedicine, _intervalTimeSupply);
+        emit NewSupply(msg.value, drugs[_hashDrug][0].nameDrug, _countOfMedicine, _intervalTimeSupply);
     }
     
     
     function createHashSupply(uint256 countOfMedicine, uint256 intervalTimeSupply) public returns (bytes32) {
-       
         bytes32 hash = keccak256(abi.encodePacked(countOfMedicine,  intervalTimeSupply, now));
         emit NewHash(hash);
         return hash;
