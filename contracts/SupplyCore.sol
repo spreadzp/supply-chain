@@ -2,15 +2,18 @@ pragma solidity ^0.4.24;
 
 contract SupplyCore {
     
-    event NewSupply(uint256 _sumTheMedicine, string _nameOfMedicine, uint256 _countOfMedicine, uint256 _intervalTimeSupply);
+    event NewSupply(uint256 _sumTheMedicine, string _nameOfMedicine, uint256 _countOfMedicine, uint256 _now, uint256 _finishTime);
     event NewHash(bytes32 _hash);
-
+    event PartnerCosighned(bytes32 _hashSupply, address _consigner);
+    
+    event T(address suppl, address[] p, uint256 countPart, address[] cosignerPartners, uint256 countCosign);
     modifier onlyNoConsignerPartnersSupplier(bytes32 hashSupply) {
-        address supplier = drugs[hashSupply][0].supplier;
+        address supplier = supplies[hashSupply][0].supplier;
         address[] storage partners = partnersOfSupplier[supplier];        
         uint256 countPartners = partners.length;
         address[] storage cosignerPartners = cosignersSupply[hashSupply];
         uint256 countCosignerPartners = cosignerPartners.length;
+        emit T(supplier, partners, countPartners, cosignerPartners, countCosignerPartners);
         bool patnerSupply = false;
         for(uint256 i = 0; i < countPartners; i++) {
             if(msg.sender == partners[i]) {
@@ -27,7 +30,7 @@ contract SupplyCore {
     }
 
     modifier onlySupplyTime(bytes32 _hashSupply) {
-    uint256 endTime = supplies[_hash].finishTimeOfSupply;
+    uint256 endTime = supplies[_hashSupply][0].finishTimeOfSupply;
         require(endTime > now);
         _;
     }
@@ -82,6 +85,7 @@ contract SupplyCore {
     
     function addSupplierPartners(address partner) public {
         _suppliers.push(partner);
+        partnersOfSupplier[msg.sender].push(partner);
     }
     
     function getSupplierPartners() public view returns (address[]){
@@ -93,25 +97,25 @@ contract SupplyCore {
     }
     
     function checkSupplyFinish(bytes32 hash) public view returns (bool){
-        return supplies[hash][0].supplyFinish;
+        return supplies[hash][0].finishTimeOfSupply < now;
     }
     
     function getSupply(bytes32 hash) public view returns (address _consumer,
         uint256 _payment,
         string _nameOfMedicine, 
         uint256 _countOfMedicine,
-        uint256 _intervalTimeOfSupply) {
+        uint256 _endSupplyTime) {
         return (supplies[hash][0].consumer, supplies[hash][0].payment,
         supplies[hash][0].nameOfMedicine, 
         supplies[hash][0].countOfMedicine,
-        supplies[hash][0].intervalTimeOfSupply);
+        supplies[hash][0].finishTimeOfSupply);
     }
     
     function checkPaymentToSupplier(bytes32 hash) public view returns (bool){
         return supplies[hash][0].paymentToSupplier;
     }
     
-
+    // add Math lib
     function createSupply (
         bytes32 _hashDrug, uint256 _countOfMedicine, uint256 _intervalTimeSupply) public payable {
         // require (_suppliers.length == 0, "supplier have not partners");
@@ -119,18 +123,22 @@ contract SupplyCore {
         require (msg.value >= sumOfConsumer, "consumer have not enough ethers for this supply");
         bytes32 newHashSupply = createHashSupply(_countOfMedicine, _intervalTimeSupply);
         consumerHashes[msg.sender].push(newHashSupply);
-        Supply memory newSupply = Supply({consumer: msg.sender, payment: msg.value,
+        uint256 endTimeOfSupply = now + _intervalTimeSupply;
+        Supply memory newSupply = Supply({
+            consumer: msg.sender, payment: msg.value,
             nameOfMedicine: drugs[_hashDrug][0].nameDrug,
             countOfMedicine: _countOfMedicine,
-            intervalTimeOfSupply: _intervalTimeSupply, supplier: drugs[_hashDrug][0].supplier,
+            finishTimeOfSupply: endTimeOfSupply, supplier: drugs[_hashDrug][0].supplier,
             supplyFinish: false, paymentToSupplier: false});
         supplies[newHashSupply].push(newSupply);
-        emit NewSupply (msg.value, drugs[_hashDrug][0].nameDrug, _countOfMedicine, _intervalTimeSupply);
+        emit NewSupply (msg.value, drugs[_hashDrug][0].nameDrug, _countOfMedicine, now, endTimeOfSupply);
     }
     
     function cosignSupply(bytes32 hashSupply) public onlySupplyTime(hashSupply)
-     onlyNoConsignerPartnersSupplier(hashSupply) {
-        cosignersSupply[hashSupply][0].push(msg.sender);
+      onlyNoConsignerPartnersSupplier(hashSupply)
+     {
+        cosignersSupply[hashSupply].push(msg.sender);
+        emit PartnerCosighned(hashSupply, msg.sender);
     }
     
     function createHashSupply(uint256 countOfMedicine, uint256 intervalTimeSupply) public returns (bytes32) {
