@@ -5,6 +5,8 @@ contract SupplyCore {
     event NewSupply(uint256 _sumTheMedicine, string _nameOfMedicine, uint256 _countOfMedicine, uint256 _now, uint256 _finishTime);
     event NewHash(bytes32 _hash);
     event PartnerCosighned(bytes32 _hashSupply, address _consigner);
+    event SupplyFullfiled(bytes32 _hashSupply, uint256 _timeLastConsigner);
+    event ConsignerGetMedicine(bytes32 _hashSupply, uint256 _timeLastConsigner);
     
     event T(address suppl, address[] p, uint256 countPart, address[] cosignerPartners, uint256 countCosign);
     modifier onlyNoConsignerPartnersSupplier(bytes32 hashSupply) {
@@ -43,6 +45,7 @@ contract SupplyCore {
         uint256 finishTimeOfSupply;
         address supplier;
         bool supplyFinish;
+        bool consignerGotDrug;
         bool paymentToSupplier;
     }
     
@@ -129,16 +132,47 @@ contract SupplyCore {
             nameOfMedicine: drugs[_hashDrug][0].nameDrug,
             countOfMedicine: _countOfMedicine,
             finishTimeOfSupply: endTimeOfSupply, supplier: drugs[_hashDrug][0].supplier,
-            supplyFinish: false, paymentToSupplier: false});
+            supplyFinish: false, consignerGotDrug: false,
+            paymentToSupplier: false});
         supplies[newHashSupply].push(newSupply);
         emit NewSupply (msg.value, drugs[_hashDrug][0].nameDrug, _countOfMedicine, now, endTimeOfSupply);
     }
     
+    event Cnt(uint256 _countPartners, uint256 _countCosignerPartners);
     function cosignSupply(bytes32 hashSupply) public onlySupplyTime(hashSupply)
       onlyNoConsignerPartnersSupplier(hashSupply)
      {
-        cosignersSupply[hashSupply].push(msg.sender);
+        cosignersSupply[hashSupply].push(msg.sender); 
         emit PartnerCosighned(hashSupply, msg.sender);
+        address supplier = supplies[hashSupply][0].supplier;
+        // uint256 countPartners = partnersOfSupplier[supplier].length; 
+        // uint256 countCosignerPartners = cosignersSupply[hashSupply].length;
+        emit Cnt(partnersOfSupplier[supplier].length, _suppliers.length);
+        if(partnersOfSupplier[supplier].length == _suppliers.length) {
+            supplies[hashSupply][0].supplyFinish = true;
+            emit SupplyFullfiled(hashSupply, now);
+        }
+    }
+    
+    modifier onlyConsumer(bytes32 hashSupply) {
+        address consumer = supplies[hashSupply][0].consumer;
+        require(consumer == msg.sender && !supplies[hashSupply][0].consignerGotDrug);
+        _;
+    }
+    
+    function proofOfConsumer(bytes32 hashSupply, bytes32 encryptedHash) public onlyConsumer(hashSupply) {
+        require(supplies[hashSupply][0].supplyFinish);
+        if(hashSupply == decryptedHash(encryptedHash) ) {
+            supplies[hashSupply][0].consignerGotDrug = true;
+           // payment this.
+            emit ConsignerGetMedicine(hashSupply, now);
+        }
+        
+    }
+    
+    function decryptedHash(bytes32 encryptedHash) public pure returns (bytes32 _hashSupply){
+        _hashSupply = encryptedHash;
+        return _hashSupply;
     }
     
     function createHashSupply(uint256 countOfMedicine, uint256 intervalTimeSupply) public returns (bytes32) {
