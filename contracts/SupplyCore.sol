@@ -7,27 +7,26 @@ contract SupplyCore {
     event PartnerCosighned(bytes32 _hashSupply, address _consigner);
     event SupplyFullfiled(bytes32 _hashSupply, uint256 _timeLastConsigner);
     event ConsignerGetMedicine(bytes32 _hashSupply, uint256 _timeLastConsigner);
+    event SupplierGotPayment(bytes32 _hashSupply, uint256 _sumSupply);
     
-    event T(address suppl, address[] p, uint256 countPart, address[] cosignerPartners, uint256 countCosign);
     modifier onlyNoConsignerPartnersSupplier(bytes32 hashSupply) {
         address supplier = supplies[hashSupply][0].supplier;
         address[] storage partners = partnersOfSupplier[supplier];        
         uint256 countPartners = partners.length;
         address[] storage cosignerPartners = cosignersSupply[hashSupply];
         uint256 countCosignerPartners = cosignerPartners.length;
-        emit T(supplier, partners, countPartners, cosignerPartners, countCosignerPartners);
-        bool patnerSupply = false;
+        bool partnerSupply = false;
         for(uint256 i = 0; i < countPartners; i++) {
             if(msg.sender == partners[i]) {
-                patnerSupply = true;
+                partnerSupply = true;
                 for(uint256 j = 0; j < countCosignerPartners; j++) {
                     if(msg.sender == cosignerPartners[j]) {
-                       patnerSupply = false; 
+                       partnerSupply = false; 
                     }
                 }
             }
         }
-        require(patnerSupply);
+        require(partnerSupply);
         _;
     }
 
@@ -160,24 +159,22 @@ contract SupplyCore {
         _;
     }
     
-    function proofOfConsumer(bytes32 hashSupply, bytes32 encryptedHash) public onlyConsumer(hashSupply) {
-        require(supplies[hashSupply][0].supplyFinish);
-        if(hashSupply == decryptedHash(encryptedHash) ) {
-            supplies[hashSupply][0].consignerGotDrug = true;
-           // payment this.
-            emit ConsignerGetMedicine(hashSupply, now);
-        }
-        
+    // consumer get drug but may fail with payment add withdrow method
+    function proofOfConsumer(bytes32 hashSupply) public onlyConsumer(hashSupply) {
+        require(supplies[hashSupply][0].supplyFinish, "the supply is not finish yet");
+        require(!supplies[hashSupply][0].consignerGotDrug, "consigner already have got the drug");
+        supplies[hashSupply][0].consignerGotDrug = true;
+        emit ConsignerGetMedicine(hashSupply, now);
+        address supplier = supplies[hashSupply][0].supplier;
+        uint256 sumSupply = supplies[hashSupply][0].payment;
+        supplier.transfer(sumSupply);
+        supplies[hashSupply][0].paymentToSupplier = true;
+        emit SupplierGotPayment(hashSupply, sumSupply);
     }
     
-    function decryptedHash(bytes32 encryptedHash) public pure returns (bytes32 _hashSupply){
-        _hashSupply = encryptedHash;
-        return _hashSupply;
-    }
     
     function createHashSupply(uint256 countOfMedicine, uint256 intervalTimeSupply) public returns (bytes32) {
         bytes32 hash = keccak256(abi.encodePacked(countOfMedicine, intervalTimeSupply, now));
         emit NewHash(hash);
         return hash;
     }
-}
